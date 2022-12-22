@@ -1,1 +1,1 @@
-# Predictiive Coding Based Multi-scale Predictive Network for Video Prediction
+# Predictive Coding Based Multi-scale Predictive Network for Video Prediction
