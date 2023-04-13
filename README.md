@@ -1,5 +1,5 @@
 # Predictive Coding Based Multi-scale Predictive Network for Video Prediction  
-[ArXiv paper is available here](http://arxiv.org/abs/2212.11642)  
+
 
 ![image](Images/EDLSTM.png) 
  
