@@ -1,5 +1,3 @@
-# Predictive Coding Based Multi-scale Predictive Network for Video Prediction  
-
 
 ![image](Images/EDLSTM.png) 
  
