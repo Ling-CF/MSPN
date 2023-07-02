@@ -16,7 +16,7 @@ class PixTraining():
         self.dataset = 'Human3.6M'
         self.AddInfo = 'None'        # additional instructions
         self.train_data_path = '/mnt/DevFiles_NAS/Ling.cf/dataset/{}/train'.format(self.dataset)
-        self.val_data_path = '/mnt/DevFiles_NAS/Ling.cf/dataset/{}/test2'.format(self.dataset)
+        self.val_data_path = '/mnt/DevFiles_NAS/Ling.cf/dataset/{}/test'.format(self.dataset)
         self.tag = 'MSPN_{}_{}.pt'.format(self.dataset, self.AddInfo)      # saving tag
         self.retrain = True           # continue training or not
         self.num_epoch = 40           # training epoch
