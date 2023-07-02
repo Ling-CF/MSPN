@@ -5,7 +5,7 @@ from MSPN import MSPNet
 import cv2
 from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 from utils import util_of_lpips, MyDataset
-os.environ['TORCH_HOME'] = '/home/Ling.cf/HHD/conda/miniconda3/torch-model'
+
 
 
 
