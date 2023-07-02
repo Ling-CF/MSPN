@@ -1,8 +1,12 @@
-# muti-scale predictive Network
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from ConvLSTM_Module import ConvLSTMCell
+Framework = 'Codec LSTM' # proposed codec LSTM network or encoder-lstm-decoder network (En-LSTM-De)
+assert Framework in ('Codec LSTM', 'En-LSTM-De')
+if Framework == 'Codec LSTM':
+    from ConvLSTM_Module import ConvLSTMCell
+else:
+    from En_LSTM_De import ConvLSTMCell
 
 class MSPNet(nn.Module):
     def __init__(self, channels, layers, in_ch, hidden_dim, BN=False):
@@ -16,19 +20,21 @@ class MSPNet(nn.Module):
         '''
         self.n_layers = layers
         self.hidden_dim = hidden_dim
+        self.channels = channels
         self.in_ch = in_ch
+        self.UseHigherEncInfo = True # using higher level encoding information or not
         assert len(channels) >= layers
 
         # E: local prediction error; L: lower prediction error; H: higher prediction
         for l in range(1, layers - 1):
-            ELHcell = ConvLSTMCell(input_dim=in_ch * 5, hidden_dim=self.hidden_dim, EnDe_channels=channels[:-l], higher_channel=channels[:-l][-2], out_dim=in_ch, BN=BN)
+            ELHcell = ConvLSTMCell(input_dim=in_ch * 5, hidden_dim=self.hidden_dim, channels=channels[:-l], higher_channel=channels[:-l][-2], out_dim=in_ch, BN=BN)
             setattr(self, 'ELHcell{}'.format(l), ELHcell)
 
         # for the highest level, no prediction from higher level
-        self.ELcell = ConvLSTMCell(input_dim=in_ch * 4, hidden_dim=self.hidden_dim, EnDe_channels=channels[:-(layers-1)], higher_channel=0, out_dim=in_ch, BN=BN)
+        self.ELcell = ConvLSTMCell(input_dim=in_ch * 4, hidden_dim=self.hidden_dim, channels=channels[:-(layers-1)], higher_channel=0, out_dim=in_ch, BN=BN)
 
         # for the lowest level, no prediction error from lower level
-        self.EHcell = ConvLSTMCell(input_dim=in_ch * 3, hidden_dim=self.hidden_dim, EnDe_channels=channels, higher_channel=channels[-2], out_dim=in_ch, BN=BN)
+        self.EHcell = ConvLSTMCell(input_dim=in_ch * 3, hidden_dim=self.hidden_dim, channels=channels, higher_channel=channels[-2], out_dim=in_ch, BN=BN)
 
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
 
@@ -51,7 +57,12 @@ class MSPNet(nn.Module):
             Error_seq[l] = torch.zeros(batch_size, self.in_ch*2, w, h).to(input.device)
 
             pred_seq[l] = torch.zeros(batch_size, self.in_ch, w, h).to(input.device)
-            Hidden_seq[l] = (torch.zeros(batch_size, self.hidden_dim, w, h).to(input.device), torch.zeros(batch_size, self.hidden_dim, w, h).to(input.device))
+            if Framework == 'Codec LSTM':
+                Hidden_seq[l] = (torch.zeros(batch_size, self.hidden_dim, w, h).
+                                 to(input.device), torch.zeros(batch_size, self.hidden_dim, w, h).to(input.device))
+            else:
+                Hidden_seq[l] = (torch.zeros(batch_size, self.channels[-(l+1)], input.size(-2) // (2**self.n_layers), input.size(-1) // (2**self.n_layers)).to(input.device),
+                             torch.zeros(batch_size, self.channels[-(l+1)], input.size(-2) // (2**self.n_layers), input.size(-1) // (2**self.n_layers)).to(input.device))
             w = w // 2
             h = h // 2
 
@@ -83,7 +94,10 @@ class MSPNet(nn.Module):
                     Lower_error = F.interpolate(Error_seq[l-1], scale_factor=0.5)
                     temp = torch.cat([Error, Lower_error], dim=1)
                     pred, next_hid_state, current_h = cell (temp, Hidden_state,  higher_h=higher_h)
-                    higher_h = current_h
+                    if self.UseHigherEncInfo:
+                        higher_h = current_h
+                    else:
+                        higher_h = None
                 else:
                     cell = getattr(self, 'ELHcell{}'.format(l))
                     Error = Error_seq[l]
@@ -92,7 +106,10 @@ class MSPNet(nn.Module):
                     Higher_pred = self.upsample(pred_seq[l + 1])
                     temp = torch.cat([Error, Lower_error, Higher_pred], dim=1)
                     pred, next_hid_state, current_h = cell(temp, Hidden_state,  higher_h=higher_h)
-                    higher_h = current_h
+                    if self.UseHigherEncInfo:
+                        higher_h = current_h
+                    else:
+                        higher_h = None
                 pred_seq[l] = pred
                 Hidden_seq[l] = next_hid_state
                 if l == 0 and t >= real_t and mode == 'test':
